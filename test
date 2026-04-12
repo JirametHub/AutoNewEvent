@@ -62,7 +62,7 @@ local Window = Fluent:CreateWindow({
 local Tabs = {
     UpdateLog = Window:AddTab({ Title = "Update Log", Icon = "list" }),
     Main = Window:AddTab({ Title = "Main", Icon = "play" }),
-    Party = Window:AddTab({ Title = "Party", Icon = "users" }),
+    Party = Window:AddTab({ Title = "Party [BETA]", Icon = "users" }),
     Merchant = Window:AddTab({ Title = "Merchant", Icon = "shopping-cart" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
