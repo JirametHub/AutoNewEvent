@@ -59,7 +59,7 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
--- จัดเรียงแท็บใหม่ เอา Party มาไว้ใต้ Main
+-- จัดเรียงแท็บ
 local Tabs = {
     UpdateLog = Window:AddTab({ Title = "Update Log", Icon = "list" }),
     Main = Window:AddTab({ Title = "Main", Icon = "play" }),
@@ -118,7 +118,7 @@ do
 
     Tabs.UpdateLog:AddParagraph({
         Title = "Version 1.0.8",
-        Content = "- Added Auto Join Bounty Hunt in Main Tab."
+        Content = "- Added Auto Join Shibuya Incident, Great Cataclysm, Bounty Hunt in Main Tab."
     })
 
     Tabs.UpdateLog:AddParagraph({
@@ -186,6 +186,15 @@ local function ReadFirebase(path)
     return nil
 end
 
+local function DeleteFirebase(path)
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return false end
+    local success, res = pcall(function()
+        return requestFunc({ Url = FirebaseURL .. path .. ".json", Method = "DELETE" })
+    end)
+    return success and res.StatusCode == 200
+end
+
 do
     Tabs.Party:AddSection("Party Statistics")
 
@@ -194,6 +203,18 @@ do
     local Member2Label = Tabs.Party:AddParagraph({ Title = "Member 2 🔴 : N/A", Content = "" })
     local Member3Label = Tabs.Party:AddParagraph({ Title = "Member 3 🔴 : N/A", Content = "" })
     local Member4Label = Tabs.Party:AddParagraph({ Title = "Member 4 🔴 : N/A", Content = "" })
+
+    local function ResetPartyUI()
+        CurrentToken = ""
+        IsHost = false
+        PartyData = nil
+        StatusLabel:SetTitle("Information Status : 🔴 Offline")
+        StatusLabel:SetDesc("Party : None\nToken : None")
+        HostLabel:SetTitle("Host 🔴 : N/A")
+        Member2Label:SetTitle("Member 2 🔴 : N/A")
+        Member3Label:SetTitle("Member 3 🔴 : N/A")
+        Member4Label:SetTitle("Member 4 🔴 : N/A")
+    end
 
     -- ลูปสำหรับอัปเดตหน้าต่าง Party แบบ Realtime ทุกๆ 3 วินาที
     task.spawn(function()
@@ -216,6 +237,12 @@ do
                     Member2Label:SetTitle("Member 2 " .. (members[1] and "🟢 : " .. members[1] or "🔴 : N/A"))
                     Member3Label:SetTitle("Member 3 " .. (members[2] and "🟢 : " .. members[2] or "🔴 : N/A"))
                     Member4Label:SetTitle("Member 4 " .. (members[3] and "🟢 : " .. members[3] or "🔴 : N/A"))
+                else
+                    -- ถ้าระบบหาข้อมูลไม่เจอ แปลว่า Host กดยุบปาร์ตี้ไปแล้ว
+                    if not IsHost then
+                        Fluent:Notify({ Title = "Party Disbanded", Content = "หัวหน้าได้ทำการยุบปาร์ตี้นี้แล้ว", Duration = 5 })
+                    end
+                    ResetPartyUI()
                 end
             end
         end
@@ -257,6 +284,24 @@ do
                 end
             else
                 Fluent:Notify({ Title = "Error", Content = "สร้างห้องในเกมไม่สำเร็จ", Duration = 3 })
+            end
+        end
+    })
+
+    local DeletePartyBtn = Tabs.Party:AddButton({
+        Title = "Remove Party (Dissolve)",
+        Description = "ยุบปาร์ตี้ (เฉพาะหัวหน้าปาร์ตี้เท่านั้น)",
+        Callback = function()
+            if IsHost and CurrentToken ~= "" then
+                local success = DeleteFirebase("Parties/" .. CurrentToken)
+                if success then
+                    Fluent:Notify({ Title = "Party Removed", Content = "ยุบปาร์ตี้เรียบร้อยแล้ว", Duration = 3 })
+                    ResetPartyUI()
+                else
+                    Fluent:Notify({ Title = "Error", Content = "ไม่สามารถเชื่อมต่อ Firebase เพื่อยุบปาร์ตี้ได้", Duration = 3 })
+                end
+            else
+                Fluent:Notify({ Title = "Warning", Content = "คุณไม่ใช่หัวหน้าปาร์ตี้ หรือยังไม่ได้สร้างปาร์ตี้", Duration = 3 })
             end
         end
     })
@@ -306,6 +351,33 @@ do
                 end
             else
                 Fluent:Notify({ Title = "Not Found", Content = "ไม่พบปาร์ตี้ หรือ Token ไม่ถูกต้อง", Duration = 3 })
+            end
+        end
+    })
+
+    local LeavePartyBtn = Tabs.Party:AddButton({
+        Title = "Leave Party",
+        Description = "ออกจากปาร์ตี้ (สำหรับลูกทีม)",
+        Callback = function()
+            if not IsHost and CurrentToken ~= "" then
+                -- ลบชื่อตัวเองออกจาก Firebase
+                local data = ReadFirebase("Parties/" .. CurrentToken)
+                if data and data.Members then
+                    local newMembers = {}
+                    for _, v in pairs(data.Members) do
+                        if v ~= player.Name then
+                            table.insert(newMembers, v)
+                        end
+                    end
+                    data.Members = newMembers
+                    WriteFirebase("Parties/" .. CurrentToken, data)
+                end
+                Fluent:Notify({ Title = "Left Party", Content = "ออกจากปาร์ตี้เรียบร้อยแล้ว", Duration = 3 })
+                ResetPartyUI()
+            elseif IsHost then
+                Fluent:Notify({ Title = "Warning", Content = "หัวหน้าปาร์ตี้ต้องใช้ปุ่ม Remove Party แทน", Duration = 3 })
+            else
+                Fluent:Notify({ Title = "Warning", Content = "คุณยังไม่ได้เข้าร่วมปาร์ตี้ใดๆ", Duration = 3 })
             end
         end
     })
