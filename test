@@ -198,7 +198,7 @@ end)
 -- [[ FEATURE: Host Return to Pick Up Members ]] --
 task.spawn(function()
     while true do
-        task.wait(1.5) -- ปรับเวลาให้ไวขึ้นเท่ากับลูปของลูกทีม
+        task.wait(15) -- ปรับเวลาให้ไวขึ้นเท่ากับลูปของลูกทีม
         if IsPartyLoaded and IsHost and CurrentToken ~= "" then
             local myLobbyStatus = isInLobby()
             
