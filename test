@@ -226,7 +226,7 @@ task.spawn(function()
                 if pickUpRequired then
                     Fluent:Notify({ Title = "Teleporting", Content = "Online member detected in Lobby! Returning to pick up...", Duration = 3 })
                     TeleportService:Teleport(LobbyPlaceID, player)
-                    task.wait(20) -- หน่วงเวลา 20 วินาที ป้องกันการเทเลพอร์ตรัวๆ
+                    task.wait(30) -- หน่วงเวลา 30 วินาที ป้องกันการเทเลพอร์ตรัวๆ
                 end
             end
         end
