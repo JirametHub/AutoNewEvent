@@ -198,7 +198,7 @@ end)
 -- [[ FEATURE: Host Return to Pick Up Members ]] --
 task.spawn(function()
     while true do
-        task.wait(20) -- เช็คสถานะเพื่อออกไปรับลูกทีมทุก 20 วินาที
+        task.wait(30) -- เช็คสถานะเพื่อออกไปรับลูกทีมทุก 30 วินาที
         if IsPartyLoaded and IsHost and CurrentToken ~= "" then
             local myLobbyStatus = isInLobby()
             
