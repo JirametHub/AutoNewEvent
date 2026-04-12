@@ -368,7 +368,7 @@ do
         end
     })
 
-    Tabs.Party:AddInput("HostWaitTime", { Title = "Lobby Wait Time (Seconds)", Description = "Wait time in Lobby before creating a room", Default = "60", Numeric = true, Finished = false })
+    Tabs.Party:AddInput("HostWaitTime", { Title = "Lobby Wait Time (Seconds)", Description = "Wait time in Lobby before creating a room", Default = "80", Numeric = true, Finished = false })
     Tabs.Party:AddInput("HostStartTime", { Title = "Room Wait Time (Seconds)", Description = "Wait time for members to join before starting", Default = "5", Numeric = true, Finished = false })
 
     Tabs.Party:AddSection("Member Management")
