@@ -508,7 +508,7 @@ do
                     if hostLobbyStatus then
                         Fluent:Notify({ Title = "Teleporting", Content = "You are not in Lobby. Returning to Lobby to find Host...", Duration = 3 })
                         TeleportService:Teleport(hostPlaceId, player)
-                        task.wait(20) -- ลูกทีมกลับล็อบบี้แล้วรอ 20 วินาทีเพื่อเช็คใหม่
+                        task.wait(30) -- ลูกทีมกลับล็อบบี้แล้วรอ 30 วินาทีเพื่อเช็คใหม่
                     end
                 end
 
