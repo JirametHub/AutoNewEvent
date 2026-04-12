@@ -581,7 +581,7 @@ do
         Content = "Spams RestartMatch when 'Easter Hunt' is not detected.\nStops automatically when 'Easter Hunt' is found."
     })
 
-    local MainToggle = Tabs.Main:AddToggle("AutoRestartMatch", {Title = "Enable Auto Restart (For Event)", Default = true })
+    local MainToggle = Tabs.Main:AddToggle("AutoRestartMatch", {Title = "Enable Auto Restart (For Event)", Default = false })
 
     local DelayInput = Tabs.Main:AddInput("RestartMatchDelay", { Title = "Delay (Seconds)", Description = "Enter delay...", Default = "0.1", Numeric = true, Finished = false, Callback = function(Value) end })
 
