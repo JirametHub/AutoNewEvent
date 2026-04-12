@@ -481,7 +481,7 @@ do
                     if hostLobbyStatus and hostJobId ~= game.JobId then
                         Fluent:Notify({ Title = "Teleporting", Content = "Teleporting to Host's server...", Duration = 3 })
                         TeleportService:TeleportToPlaceInstance(game.PlaceId, hostJobId, player)
-                        task.wait(20) -- ลูกทีมออกไปหา Host แล้วรอ 20 วินาทีเพื่อเช็คใหม่
+                        task.wait(30) -- ลูกทีมออกไปหา Host แล้วรอ 30 วินาทีเพื่อเช็คใหม่
                     elseif hostLobbyStatus and hostJobId == game.JobId then
                         local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
                         if playRoomFolder then
