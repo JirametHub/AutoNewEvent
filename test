@@ -1,0 +1,1148 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- [[ ระบบ Discord Webhook ]] --
+task.spawn(function()
+    pcall(function()
+        local WebhookURL = "https://discord.com/api/webhooks/1401441126547980348/R7mqECjgDet4OuCVD3XjGLtkFEUiw04uQ1YCRhSrrstqvz2Waw6BR2YYrnDMMMDUnxq1"
+        local player = game:GetService("Players").LocalPlayer
+        local HttpService = game:GetService("HttpService")
+        local requestFunc = http_request or request or HttpPost or syn.request
+        
+        if requestFunc then
+            local data = {
+                ["embeds"] = {
+                    {
+                        ["title"] = "🚀 Jiramet Hub Executed!",
+                        ["description"] = "มีผู้ใช้งานทำการรันสคริปต์ Jiramet Hub",
+                        ["color"] = 3447003,
+                        ["fields"] = {
+                            {
+                                ["name"] = "👤 Username",
+                                ["value"] = "||" .. player.Name .. "||",
+                                ["inline"] = true
+                            },
+                            {
+                                ["name"] = "📛 Display Name",
+                                ["value"] = player.DisplayName,
+                                ["inline"] = true
+                            }
+                        },
+                        ["footer"] = {
+                            ["text"] = "Jiramet Hub (TH) - Version 1.1.0"
+                        },
+                        ["timestamp"] = DateTime.now():ToIsoDate()
+                    }
+                }
+            }
+
+            requestFunc({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(data)
+            })
+        end
+    end)
+end)
+
+local Window = Fluent:CreateWindow({
+    Title = "Re:rangers X",
+    SubTitle = "by Jiramet Hub (TH)",
+    TabWidth = 100,
+    Size = UDim2.fromOffset(450, 350), 
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    UpdateLog = Window:AddTab({ Title = "Update Log", Icon = "list" }),
+    Main = Window:AddTab({ Title = "Main", Icon = "play" }),
+    Party = Window:AddTab({ Title = "Party", Icon = "users" }),
+    Merchant = Window:AddTab({ Title = "Merchant", Icon = "shopping-cart" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+local SetBlackScreenState 
+
+-- [[ System Variables ]] --
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RestartMatchRemote = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("OnGame"):WaitForChild("RestartMatch")
+local MerchantRemote = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("Gameplay"):WaitForChild("Merchant")
+local PlayRoomEvent = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("PlayRoom"):WaitForChild("Event")
+local EasterEggRemote = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("Gameplay"):WaitForChild("EasterEgg")
+local HttpService = game:GetService("HttpService")
+local player = game:GetService("Players").LocalPlayer
+
+-- Map Check Function
+local function isMapLoaded()
+    return workspace:FindFirstChild("Building") and workspace.Building:FindFirstChild("WholeMap")
+end
+
+local function isInLobby()
+    if workspace:FindFirstChild("Lobby") and workspace.Lobby:FindFirstChild("Lobby") then
+        return true
+    end
+    return false
+end
+
+-- [[ Anti-AFK (Auto Jump แบบจำลองกด Spacebar) ]] --
+task.spawn(function()
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    while true do
+        task.wait(180) 
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+        end)
+    end
+end)
+
+-- [[ Section: Update Log ]] --
+do
+    Tabs.UpdateLog:AddParagraph({
+        Title = "Developer Message (PLEASE READ!!!)",
+        Content = "EN:\nRegarding the unit upgrade issue: this is a game-side bug and is not related to our script. Since the root cause is within the game's own system, we cannot provide a fix for this.\nTH\nเกี่ยวกับปัญหาการอัปเกรดยูนิต: นี่เป็นบั๊กฝั่งเกมและไม่เกี่ยวข้องกับสคริปต์ของเรา เนื่องจากสาเหตุหลักอยู่ที่ระบบของเกมเอง ทางเราจึงไม่สามารถแก้ไขได้"
+    })
+
+    Tabs.UpdateLog:AddSection("Changelog")
+
+    Tabs.UpdateLog:AddParagraph({
+        Title = "Version 1.1.0 (Major Update)",
+        Content = "- Rebuilt Advanced Party System with Firebase Realtime Sync.\n- Added Cross-Server Auto Join (Alts automatically teleport to the Host's server).\n- Added Smart Auto Join Room (Alts continuously spam join commands to prevent failure and send ready signals to the Host).\n- Added Host Smart Wait Logic (Host strictly waits for all members to enter the room before starting the match automatically).\n- Added Auto Save & Restore for Party State (Reconnects automatically on execute/rejoin).\n- Added UI buttons for Leave Party and Remove Party (Dissolve)."
+    })
+
+    Tabs.UpdateLog:AddParagraph({
+        Title = "Version 1.0.8 - 1.0.9",
+        Content = "- Added Advanced Party System (Sync Firebase)\n- Added Auto Join Event/Incident in Main Tab."
+    })
+
+    Tabs.UpdateLog:AddParagraph({
+        Title = "Version 1.0.1 - 1.0.7",
+        Content = "- Initial Release & Other improvements"
+    })
+end
+
+-- ==========================================
+-- [[ Section: Party System (Firebase) ]] 
+-- ==========================================
+local FirebaseURL = "https://jiramethub-party-e284d-default-rtdb.asia-southeast1.firebasedatabase.app/"
+local CurrentToken = ""
+local IsHost = false
+local PartyData = nil
+local IsPartyLoaded = false -- ตัวล็อกการกระทำรอโหลดเซฟปาร์ตี้
+
+local function WriteFirebase(path, data)
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return false end
+    local success, res = pcall(function()
+        return requestFunc({
+            Url = FirebaseURL .. path .. ".json",
+            Method = "PUT",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+    return success and res.StatusCode == 200
+end
+
+local function ReadFirebase(path)
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return nil end
+    local success, res = pcall(function()
+        return requestFunc({ Url = FirebaseURL .. path .. ".json", Method = "GET" })
+    end)
+    if success and res.StatusCode == 200 and res.Body ~= "null" then
+        return HttpService:JSONDecode(res.Body)
+    end
+    return nil
+end
+
+local function DeleteFirebase(path)
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return false end
+    local success, res = pcall(function()
+        return requestFunc({ Url = FirebaseURL .. path .. ".json", Method = "DELETE" })
+    end)
+    return success and res.StatusCode == 200
+end
+
+local function SavePartyState()
+    pcall(function()
+        if makefolder and not isfolder("JirametHubConfig") then makefolder("JirametHubConfig") end
+        local state = { Token = CurrentToken, IsHost = IsHost }
+        if writefile then writefile("JirametHubConfig/Party_State.json", HttpService:JSONEncode(state)) end
+    end)
+end
+
+do
+    -- คำอธิบายการทำงานที่ถูกอัปเดตให้ตรงกับระบบ Host Wait Config และเช็กสถานะ Lobby
+    Tabs.Party:AddParagraph({
+        Title = "How Party System Works",
+        Content = "1. [Host] Click 'Create Party'. The script creates a Party and generates a 6-digit Token.\n2. [Member] Enter the Token and click 'Join Party'.\n3. [Member] Enable 'Auto Join Leader Room'. If the Host is in a different server, you will automatically teleport to them.\n4. [Host Wait Logic] The Host checks if any member is currently in the Lobby. If yes, it waits for the configured 'Wait Time' before creating a room. If no one is in the Lobby, it skips waiting.\n5. [Auto Start] The Host creates a room, waits for the configured 'Start Time', and then automatically spams the Start button."
+    })
+
+    Tabs.Party:AddSection("Party Statistics")
+
+    local StatusLabel = Tabs.Party:AddParagraph({ Title = "Information Status : 🔴 Offline", Content = "Party : None\nToken : None" })
+    local HostLabel = Tabs.Party:AddParagraph({ Title = "Host 🔴 : N/A", Content = "" })
+    local Member2Label = Tabs.Party:AddParagraph({ Title = "Member 2 🔴 : N/A", Content = "" })
+    local Member3Label = Tabs.Party:AddParagraph({ Title = "Member 3 🔴 : N/A", Content = "" })
+    local Member4Label = Tabs.Party:AddParagraph({ Title = "Member 4 🔴 : N/A", Content = "" })
+
+    local function ResetPartyUI()
+        CurrentToken = ""
+        IsHost = false
+        PartyData = nil
+        SavePartyState()
+        StatusLabel:SetTitle("Information Status : 🔴 Offline")
+        StatusLabel:SetDesc("Party : None\nToken : None")
+        HostLabel:SetTitle("Host 🔴 : N/A")
+        Member2Label:SetTitle("Member 2 🔴 : N/A")
+        Member3Label:SetTitle("Member 3 🔴 : N/A")
+        Member4Label:SetTitle("Member 4 🔴 : N/A")
+    end
+
+    -- ลูปสำหรับอัปเดตหน้าต่าง Party แบบ Realtime
+    task.spawn(function()
+        while true do
+            task.wait(3)
+            if CurrentToken ~= "" then
+                local data = ReadFirebase("Parties/" .. CurrentToken)
+                if data then
+                    if IsHost then
+                        local changed = false
+                        if data.JobId ~= game.JobId then data.JobId = game.JobId; changed = true end
+                        if data.PlaceId ~= game.PlaceId then data.PlaceId = game.PlaceId; changed = true end
+                        local currentLobby = isInLobby()
+                        if data.IsInLobby ~= currentLobby then data.IsInLobby = currentLobby; changed = true end
+                        
+                        if changed then WriteFirebase("Parties/" .. CurrentToken, data) end
+                    end
+                    
+                    PartyData = data
+                    StatusLabel:SetTitle("Information Status : 🟢 Online")
+                    StatusLabel:SetDesc("Party : " .. data.Name .. "\nToken : " .. CurrentToken)
+                    
+                    if data.JobId == game.JobId then
+                        HostLabel:SetTitle("Host 🟢 : " .. data.Host)
+                    else
+                        HostLabel:SetTitle("Host 🟡 : " .. data.Host .. " (Different Server)")
+                    end
+                    
+                    local membersList = {}
+                    if type(data.Members) == "table" then
+                        for _, v in pairs(data.Members) do
+                            table.insert(membersList, v)
+                        end
+                    end
+                    
+                    Member2Label:SetTitle("Member 2 " .. (membersList[1] and "🟢 : " .. membersList[1] or "🔴 : N/A"))
+                    Member3Label:SetTitle("Member 3 " .. (membersList[2] and "🟢 : " .. membersList[2] or "🔴 : N/A"))
+                    Member4Label:SetTitle("Member 4 " .. (membersList[3] and "🟢 : " .. membersList[3] or "🔴 : N/A"))
+                else
+                    if not IsHost then
+                        Fluent:Notify({ Title = "Party Disbanded", Content = "หัวหน้าได้ทำการยุบปาร์ตี้นี้แล้ว", Duration = 5 })
+                    end
+                    ResetPartyUI()
+                end
+            end
+        end
+    end)
+
+    Tabs.Party:AddSection("Party Create (Host)")
+
+    local PartyNameInput = Tabs.Party:AddInput("PartyName", { Title = "Party Name", Description = "ตั้งชื่อปาร์ตี้ของคุณ", Default = "For Test", Numeric = false, Finished = false })
+
+    local CreatePartyBtn = Tabs.Party:AddButton({
+        Title = "Create Party",
+        Description = "สร้างปาร์ตี้และสร้าง Token",
+        Callback = function()
+            CurrentToken = tostring(math.random(100000, 999999))
+            IsHost = true
+            PartyData = {
+                Name = Options.PartyName.Value,
+                Host = player.Name,
+                HostDisplay = player.DisplayName,
+                JobId = game.JobId,
+                PlaceId = game.PlaceId,
+                IsInLobby = isInLobby(),
+                RoomName = player.Name, 
+                Members = {}
+            }
+            
+            if WriteFirebase("Parties/" .. CurrentToken, PartyData) then
+                SavePartyState()
+                Fluent:Notify({ Title = "Party Created!", Content = "Token ของคุณคือ: " .. CurrentToken, Duration = 5 })
+            else
+                Fluent:Notify({ Title = "Error", Content = "ไม่สามารถเชื่อมต่อ Firebase ได้", Duration = 3 })
+            end
+        end
+    })
+
+    local DeletePartyBtn = Tabs.Party:AddButton({
+        Title = "Remove Party (Dissolve)",
+        Description = "ยุบปาร์ตี้ (เฉพาะหัวหน้าปาร์ตี้เท่านั้น)",
+        Callback = function()
+            if IsHost and CurrentToken ~= "" then
+                local success = DeleteFirebase("Parties/" .. CurrentToken)
+                if success then
+                    Fluent:Notify({ Title = "Party Removed", Content = "ยุบปาร์ตี้เรียบร้อยแล้ว", Duration = 3 })
+                    ResetPartyUI()
+                else
+                    Fluent:Notify({ Title = "Error", Content = "ไม่สามารถเชื่อมต่อ Firebase เพื่อยุบปาร์ตี้ได้", Duration = 3 })
+                end
+            else
+                Fluent:Notify({ Title = "Warning", Content = "คุณไม่ใช่หัวหน้าปาร์ตี้ หรือยังไม่ได้สร้างปาร์ตี้", Duration = 3 })
+            end
+        end
+    })
+
+    -- เพิ่ม Config สำหรับตั้งเวลา Host ใต้ปุ่ม Party
+    Tabs.Party:AddInput("HostWaitTime", { Title = "Host Wait Time (Seconds)", Description = "เวลารอลูกทีมที่ล็อบบี้ก่อนสร้างห้อง", Default = "60", Numeric = true, Finished = false })
+    Tabs.Party:AddInput("HostStartTime", { Title = "Host Start Time (Seconds)", Description = "เวลารอลูกทีมเข้าห้องก่อนกดเริ่ม", Default = "5", Numeric = true, Finished = false })
+
+    Tabs.Party:AddSection("Party Join (Alt)")
+
+    local TokenInput = Tabs.Party:AddInput("JoinToken", { Title = "Input Token", Description = "ใส่รหัส Token 6 หลักเพื่อเข้าร่วม", Default = "", Numeric = true, Finished = false })
+
+    local JoinPartyBtn = Tabs.Party:AddButton({
+        Title = "Join Party",
+        Description = "เข้าร่วมปาร์ตี้",
+        Callback = function()
+            local inputToken = Options.JoinToken.Value
+            if inputToken == "" then return end
+
+            local data = ReadFirebase("Parties/" .. inputToken)
+            if data then
+                CurrentToken = inputToken
+                IsHost = false
+                
+                local membersList = {}
+                if type(data.Members) == "table" then
+                    for _, v in pairs(data.Members) do
+                        table.insert(membersList, v)
+                    end
+                end
+                
+                local found = false
+                for _, v in pairs(membersList) do
+                    if v == player.Name then found = true end
+                end
+                if not found then
+                    table.insert(membersList, player.Name)
+                    data.Members = membersList
+                    WriteFirebase("Parties/" .. inputToken, data)
+                end
+                
+                PartyData = data
+                SavePartyState()
+                
+                if data.JobId == game.JobId then
+                    Fluent:Notify({ Title = "Joined!", Content = "คุณอยู่ในเซิร์ฟเวอร์เดียวกับ Host แล้ว กำลังเข้าห้อง...", Duration = 3 })
+                    pcall(function()
+                        local targetRoom = game:GetService("ReplicatedStorage"):WaitForChild("PlayRoom"):WaitForChild(data.RoomName, 10)
+                        if targetRoom then
+                            PlayRoomEvent:FireServer("Join-Room", { Room = targetRoom })
+                            WriteFirebase("Parties/"..CurrentToken.."/ReadyMembers/"..player.Name, true)
+                            Fluent:Notify({ Title = "Room Joined", Content = "เข้าห้องของหัวหน้าสำเร็จ!", Duration = 3 })
+                        end
+                    end)
+                else
+                    Fluent:Notify({ Title = "Teleporting...", Content = "กำลังวาร์ปไปหาหัวหน้าปาร์ตี้...", Duration = 5 })
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, data.JobId, player)
+                end
+            else
+                Fluent:Notify({ Title = "Not Found", Content = "ไม่พบปาร์ตี้ หรือ Token ไม่ถูกต้อง", Duration = 3 })
+            end
+        end
+    })
+
+    local LeavePartyBtn = Tabs.Party:AddButton({
+        Title = "Leave Party",
+        Description = "ออกจากปาร์ตี้ (สำหรับลูกทีม)",
+        Callback = function()
+            if not IsHost and CurrentToken ~= "" then
+                local data = ReadFirebase("Parties/" .. CurrentToken)
+                if data and data.Members then
+                    local newMembers = {}
+                    for _, v in pairs(data.Members) do
+                        if v ~= player.Name then
+                            table.insert(newMembers, v)
+                        end
+                    end
+                    data.Members = newMembers
+                    WriteFirebase("Parties/" .. CurrentToken, data)
+                end
+                Fluent:Notify({ Title = "Left Party", Content = "ออกจากปาร์ตี้เรียบร้อยแล้ว", Duration = 3 })
+                ResetPartyUI()
+            elseif IsHost then
+                Fluent:Notify({ Title = "Warning", Content = "หัวหน้าปาร์ตี้ต้องใช้ปุ่ม Remove Party แทน", Duration = 3 })
+            else
+                Fluent:Notify({ Title = "Warning", Content = "คุณยังไม่ได้เข้าร่วมปาร์ตี้ใดๆ", Duration = 3 })
+            end
+        end
+    })
+    
+    local AutoJoinToggle = Tabs.Party:AddToggle("AutoJoinLeader", { Title = "Enable Auto Join Leader Room", Description = "สแปมเข้าห้อง Host อัตโนมัติ", Default = false })
+
+    -- ลูปสำหรับ Alt: เช็กสถานะ Lobby, ออฟไลน์, และยิงเข้าห้อง
+    local AltInRoom = false
+    local currentLobbyState = nil
+    local currentReadyState = nil
+
+    task.spawn(function()
+        while true do
+            task.wait(1.5)
+            if IsPartyLoaded and Options.AutoJoinLeader and Options.AutoJoinLeader.Value and not IsHost and CurrentToken ~= "" and PartyData then
+                local myLobbyStatus = isInLobby()
+                local hostLobbyStatus = PartyData.IsInLobby
+                local hostJobId = PartyData.JobId
+                local hostPlaceId = PartyData.PlaceId or game.PlaceId
+                local isReady = false
+
+                if myLobbyStatus ~= currentLobbyState then
+                    currentLobbyState = myLobbyStatus
+                    task.spawn(function() WriteFirebase("Parties/"..CurrentToken.."/LobbyMembers/"..player.Name, myLobbyStatus) end)
+                end
+
+                if myLobbyStatus then
+                    if hostLobbyStatus and hostJobId ~= game.JobId then
+                        Fluent:Notify({ Title = "Teleporting", Content = "กำลังย้ายเซิร์ฟเวอร์ไปหา Host...", Duration = 3 })
+                        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, hostJobId, player)
+                        task.wait(10)
+                    elseif hostLobbyStatus and hostJobId == game.JobId then
+                        local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
+                        if playRoomFolder then
+                            local hostRoom = playRoomFolder:FindFirstChild(PartyData.RoomName)
+                            if hostRoom then
+                                pcall(function()
+                                    PlayRoomEvent:FireServer("Join-Room", { Room = hostRoom })
+                                end)
+
+                                if not AltInRoom then
+                                    AltInRoom = true
+                                    Fluent:Notify({ Title = "Party", Content = "เข้าห้องและส่งสัญญาณความพร้อมไปที่ Host แล้ว!", Duration = 2 })
+                                end
+                                isReady = true
+                            else
+                                AltInRoom = false
+                            end
+                        end
+                    else
+                        AltInRoom = false
+                    end
+                else
+                    AltInRoom = false
+                    if hostLobbyStatus then
+                        Fluent:Notify({ Title = "Teleporting", Content = "คุณไม่ได้อยู่ Lobby กำลังกลับ Lobby เพื่อไปหา Host...", Duration = 3 })
+                        game:GetService("TeleportService"):Teleport(hostPlaceId, player)
+                        task.wait(10)
+                    end
+                end
+
+                if currentReadyState ~= isReady then
+                    currentReadyState = isReady
+                    task.spawn(function() WriteFirebase("Parties/"..CurrentToken.."/ReadyMembers/"..player.Name, isReady) end)
+                end
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- ฟังก์ชันกลาง: ระบบหน่วงเวลา Config ก่อนสร้างห้อง และ เริ่มเกม
+-- ==========================================
+
+-- ตัวแปรเช็กว่า Host ได้ทำการยืนรอ ไปหรือยัง (จะได้ไม่รอซ้ำซ้อน)
+local HostLobbyWaitDone = false
+
+-- รีเซ็ตตัวแปรเมื่อ Host ออกจาก Lobby
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if not isInLobby() then
+            HostLobbyWaitDone = false
+        end
+    end
+end)
+
+local function PerformHostWait(toggleOption)
+    if IsHost and CurrentToken ~= "" and not HostLobbyWaitDone then
+        local data = ReadFirebase("Parties/" .. CurrentToken)
+        local anyInLobby = false
+        
+        -- เช็กว่ามีลูกทีมคนไหรอยู่ใน Lobby ไหม (ไม่นับ Host เอง)
+        if data and type(data.LobbyMembers) == "table" then
+            for memName, inLobby in pairs(data.LobbyMembers) do
+                if inLobby == true and memName ~= player.Name then
+                    anyInLobby = true
+                    break
+                end
+            end
+        end
+        
+        if not anyInLobby then
+            Fluent:Notify({ Title = "Party", Content = "ไม่มีลูกทีมอยู่ Lobby ข้ามการรอสร้างห้อง...", Duration = 3 })
+            HostLobbyWaitDone = true
+            return true
+        end
+
+        local waitTime = tonumber(Options.HostWaitTime.Value) or 60
+        Fluent:Notify({ Title = "Party", Content = "พบลูกทีมใน Lobby! ยืนรอ " .. waitTime .. " วินาที...", Duration = 10 })
+        
+        for i = 1, waitTime do
+            if i == math.floor(waitTime / 2) and waitTime > 10 then
+                Fluent:Notify({ Title = "Party", Content = "รออีก " .. (waitTime - i) .. " วินาที ก่อนสร้างห้อง...", Duration = 5 })
+            end
+            -- ถ้าระหว่างรอ ผู้เล่นปิดสวิตช์ หรือไม่อยู่ใน Lobby แล้ว ให้ยกเลิกการทำงาน
+            if not toggleOption.Value or not isInLobby() then 
+                return false 
+            end
+            task.wait(1)
+        end
+        HostLobbyWaitDone = true
+    end
+    return true
+end
+
+local function WaitBeforeStart(toggleOption)
+    if IsHost and CurrentToken ~= "" then
+        local startTime = tonumber(Options.HostStartTime.Value) or 5
+        Fluent:Notify({ Title = "Party", Content = "สร้างห้องแล้ว! รอลูกทีมเข้าห้อง " .. startTime .. " วินาที...", Duration = 5 })
+        for i = 1, startTime do
+            -- ถ้าระหว่างรอ ผู้เล่นปิดสวิตช์ หรือไม่อยู่ใน Lobby แล้ว ให้ยกเลิกการทำงาน
+            if not toggleOption.Value or not isInLobby() then 
+                return false 
+            end
+            task.wait(1)
+        end
+    else
+        -- ถ้าไม่ได้สร้างปาร์ตี้ หรือไม่ได้เป็น Host ให้รอแค่ 1.5 วินาที
+        task.wait(1.5)
+    end
+    return true
+end
+
+-- [[ Section: Main ]] --
+do
+    Tabs.Main:AddSection("Auto Restart (For Event)")
+    
+    Tabs.Main:AddParagraph({
+        Title = "How it works:",
+        Content = "Spams RestartMatch when 'Easter Hunt' is not detected.\nStops automatically when 'Easter Hunt' is found."
+    })
+
+    local MainToggle = Tabs.Main:AddToggle("AutoRestartMatch", {Title = "Enable Auto Restart (For Event)", Default = true })
+
+    local DelayInput = Tabs.Main:AddInput("RestartMatchDelay", { Title = "Delay (Seconds)", Description = "Enter delay...", Default = "0.1", Numeric = true, Finished = false, Callback = function(Value) end })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
+            if Options.AutoRestartMatch.Value then
+                if not isMapLoaded() then
+                    RestartMatchRemote:FireServer()
+                    local delayTime = tonumber(Options.RestartMatchDelay.Value) or 0.1
+                    task.wait(delayTime) 
+                else
+                    repeat task.wait(1) until not isMapLoaded() or not Options.AutoRestartMatch.Value
+                end
+            end
+        end
+    end)
+
+    -- [[ FEATURE: Auto Join Ghoul Hunt ]] --
+    Tabs.Main:AddSection("Auto Join Ghoul Hunt")
+    Tabs.Main:AddParagraph({ Title = "How it works:", Content = "Automatically creates a Ghoul hunt room and then automatically starts (Works only in Lobby)." })
+    local GhoulHuntToggle = Tabs.Main:AddToggle("AutoGhoulHunt", { Title = "Enable Auto Join Ghoul Hunt", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if IsPartyLoaded and Options.AutoGhoulHunt and Options.AutoGhoulHunt.Value then
+                if isInLobby() then
+                    pcall(function()
+                        -- บังคับ Host ยืนรอ (ถ้ามีคนในล็อบบี้)
+                        if not PerformHostWait(Options.AutoGhoulHunt) then return end
+                        
+                        local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
+                        local myRoom = playRoomFolder and playRoomFolder:FindFirstChild(player.Name)
+                        
+                        -- ถ้ายังไม่มีห้อง ให้สร้างห้อง
+                        if not myRoom then
+                            PlayRoomEvent:FireServer("Fate Mode")
+                            task.wait(1)
+                        end
+                        
+                        -- รอก่อนเริ่มเกม
+                        if not WaitBeforeStart(Options.AutoGhoulHunt) then return end
+                        
+                        while Options.AutoGhoulHunt.Value and isInLobby() do
+                            PlayRoomEvent:FireServer("Start")
+                            task.wait(2)
+                            -- เช็กว่าห้องหายไปหรือยัง (ถ้าหายแปลว่าเกมรับคำสั่งแล้ว กำลังวาร์ปเข้าด่าน)
+                            if not (playRoomFolder and playRoomFolder:FindFirstChild(player.Name)) then
+                                repeat task.wait(1) until not isInLobby() or not Options.AutoGhoulHunt.Value
+                                break
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+
+    -- [[ FEATURE: Auto Join Shibuya Incident ]] --
+    Tabs.Main:AddSection("Auto Join Shibuya Incident")
+    Tabs.Main:AddParagraph({ Title = "How it works:", Content = "Automatically creates a Shibuya Incident room (Calamity) and then automatically starts (Works only in Lobby)." })
+    local ShibuyaToggle = Tabs.Main:AddToggle("AutoShibuya", { Title = "Enable Auto Join Shibuya Incident", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if IsPartyLoaded and Options.AutoShibuya and Options.AutoShibuya.Value then
+                if isInLobby() then
+                    pcall(function()
+                        -- บังคับ Host ยืนรอ (ถ้ามีคนในล็อบบี้)
+                        if not PerformHostWait(Options.AutoShibuya) then return end
+                        
+                        local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
+                        local myRoom = playRoomFolder and playRoomFolder:FindFirstChild(player.Name)
+                        
+                        if not myRoom then
+                            PlayRoomEvent:FireServer("Create")
+                            task.wait(1) 
+                            PlayRoomEvent:FireServer("Change-Mode", { Mode = "Calamity" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-World", { World = "Calamity" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-Chapter", { Chapter = "Calamity_Chapter1" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Submit")
+                            task.wait(1)
+                        end
+                        
+                        if not WaitBeforeStart(Options.AutoShibuya) then return end
+                        
+                        while Options.AutoShibuya.Value and isInLobby() do
+                            PlayRoomEvent:FireServer("Start")
+                            task.wait(2)
+                            if not (playRoomFolder and playRoomFolder:FindFirstChild(player.Name)) then
+                                repeat task.wait(1) until not isInLobby() or not Options.AutoShibuya.Value
+                                break
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+
+    -- [[ FEATURE: Auto Join Great Cataclysm ]] --
+    Tabs.Main:AddSection("Auto Join Great Cataclysm")
+    Tabs.Main:AddParagraph({ Title = "How it works:", Content = "Automatically creates a Great Cataclysm room (Calamity Chapter 2) and then automatically starts (Works only in Lobby)." })
+    local GreatCataclysmToggle = Tabs.Main:AddToggle("AutoGreatCataclysm", { Title = "Enable Auto Join Great Cataclysm", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if IsPartyLoaded and Options.AutoGreatCataclysm and Options.AutoGreatCataclysm.Value then
+                if isInLobby() then
+                    pcall(function()
+                        -- บังคับ Host ยืนรอ (ถ้ามีคนในล็อบบี้)
+                        if not PerformHostWait(Options.AutoGreatCataclysm) then return end
+                        
+                        local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
+                        local myRoom = playRoomFolder and playRoomFolder:FindFirstChild(player.Name)
+                        
+                        if not myRoom then
+                            PlayRoomEvent:FireServer("Create")
+                            task.wait(1) 
+                            PlayRoomEvent:FireServer("Change-Mode", { Mode = "Calamity" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-World", { World = "Calamity" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-Chapter", { Chapter = "Calamity_Chapter2" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Submit")
+                            task.wait(1)
+                        end
+                        
+                        if not WaitBeforeStart(Options.AutoGreatCataclysm) then return end
+                        
+                        while Options.AutoGreatCataclysm.Value and isInLobby() do
+                            PlayRoomEvent:FireServer("Start")
+                            task.wait(2)
+                            if not (playRoomFolder and playRoomFolder:FindFirstChild(player.Name)) then
+                                repeat task.wait(1) until not isInLobby() or not Options.AutoGreatCataclysm.Value
+                                break
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+
+    -- [[ FEATURE: Auto Join Bounty Hunt ]] --
+    Tabs.Main:AddSection("Auto Join Bounty Hunt")
+    Tabs.Main:AddParagraph({ Title = "How it works:", Content = "Automatically creates a Bounty Hunt room (Invasion Chapter 1) and then automatically starts (Works only in Lobby)." })
+    local BountyHuntToggle = Tabs.Main:AddToggle("AutoBountyHunt", { Title = "Enable Auto Join Bounty Hunt", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if IsPartyLoaded and Options.AutoBountyHunt and Options.AutoBountyHunt.Value then
+                if isInLobby() then
+                    pcall(function()
+                        -- บังคับ Host ยืนรอ (ถ้ามีคนในล็อบบี้)
+                        if not PerformHostWait(Options.AutoBountyHunt) then return end
+                        
+                        local playRoomFolder = game:GetService("ReplicatedStorage"):FindFirstChild("PlayRoom")
+                        local myRoom = playRoomFolder and playRoomFolder:FindFirstChild(player.Name)
+                        
+                        if not myRoom then
+                            PlayRoomEvent:FireServer("Create")
+                            task.wait(1) 
+                            PlayRoomEvent:FireServer("Change-Mode", { Mode = "Calamity" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-World", { World = "Invasion" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Change-Chapter", { Chapter = "Invasion_Chapter1" })
+                            task.wait(1)
+                            PlayRoomEvent:FireServer("Submit")
+                            task.wait(1)
+                        end
+                        
+                        if not WaitBeforeStart(Options.AutoBountyHunt) then return end
+                        
+                        while Options.AutoBountyHunt.Value and isInLobby() do
+                            PlayRoomEvent:FireServer("Start")
+                            task.wait(2)
+                            if not (playRoomFolder and playRoomFolder:FindFirstChild(player.Name)) then
+                                repeat task.wait(1) until not isInLobby() or not Options.AutoBountyHunt.Value
+                                break
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+-- [[ Section: Merchant ]] --
+do
+    Tabs.Merchant:AddSection("Auto Event Capsule")
+    Tabs.Merchant:AddParagraph({ Title = "How it works", Content = "Automatically buys Easter Basket capsules" })
+
+    local CapsuleToggle = Tabs.Merchant:AddToggle("AutoBuyCapsule", {Title = "Enable Auto Buy Easter Basket", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(1) 
+            if Options.AutoBuyCapsule and Options.AutoBuyCapsule.Value then
+                pcall(function()
+                    EasterEggRemote:FireServer("Easter Basket", 100000)
+                end)
+            end
+        end
+    end)
+
+    Tabs.Merchant:AddSection("Auto Merchant")
+    Tabs.Merchant:AddParagraph({ Title = "How it works:", Content = "Select items to buy automatically.\nCooldown: 60 seconds before next purchase." })
+
+    local MultiDropdown = Tabs.Merchant:AddDropdown("MerchantItems", {
+        Title = "Select Items",
+        Description = "Select items to purchase",
+        Values = {
+            "Cursed Finger", "Dr. Megga Punk", "Green Bean", "Onigiri", 
+            "Perfect Stats Key", "Ramen", "Ranger Crystal", "Rubber Fruit", 
+            "Soul Fragments", "Stat Boosters", "Stats Key", "Trait Reroll"
+        },
+        Multi = true,
+        Default = {},
+    })
+
+    local MerchantToggle = Tabs.Merchant:AddToggle("AutoBuyMerchant", {Title = "Enable Auto Buy Merchant", Default = false })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
+            if Options.AutoBuyMerchant.Value then
+                local hasSelected = false
+                for ItemName, Selected in pairs(Options.MerchantItems.Value) do
+                    if Selected then
+                        hasSelected = true
+                        MerchantRemote:FireServer(ItemName, 100)
+                        task.wait(0.5) 
+                    end
+                end
+                
+                if hasSelected then
+                    task.wait(60)
+                else
+                    task.wait(1) 
+                end
+            end
+        end
+    end)
+end
+
+-- ตัวแปรสำหรับระบบ Smart Auto Save
+local lastSavedState = {}
+local updateSavedState
+local isConfigLoaded = false 
+
+-- [[ Section: Settings (Utility & UI) ]] --
+do
+    Tabs.Settings:AddParagraph({ Title = "Utility Features", Content = "Manage performance and saving options." })
+
+    local AutoCloseToggle = Tabs.Settings:AddToggle("AutoCloseUI", {Title = "Auto Close UI on Execute", Default = true })
+
+    -- Black Screen GUI Logic 
+    local BlackScreenGui = Instance.new("ScreenGui")
+    BlackScreenGui.Name = "JirametHubBlackScreen"
+    BlackScreenGui.Parent = game:GetService("CoreGui")
+    BlackScreenGui.Enabled = true 
+    BlackScreenGui.IgnoreGuiInset = true 
+    BlackScreenGui.DisplayOrder = 999 
+    BlackScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local BlackFrame = Instance.new("Frame")
+    BlackFrame.Name = "BlackBackground"
+    BlackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    BlackFrame.Size = UDim2.new(1, 0, 1, 0)
+    BlackFrame.Visible = false 
+    BlackFrame.ZIndex = 1
+    BlackFrame.Parent = BlackScreenGui
+
+    local BlackScreenBtn = Instance.new("TextButton")
+    BlackScreenBtn.Name = "ToggleBlackScreenBtn"
+    BlackScreenBtn.Position = UDim2.new(0.5, -75, 0, 15) 
+    BlackScreenBtn.Size = UDim2.new(0, 150, 0, 35)
+    BlackScreenBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    BlackScreenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BlackScreenBtn.Text = "Black Screen: OFF"
+    BlackScreenBtn.Font = Enum.Font.GothamBold
+    BlackScreenBtn.TextSize = 14
+    BlackScreenBtn.ZIndex = 2 
+    BlackScreenBtn.Visible = false 
+    BlackScreenBtn.Parent = BlackScreenGui
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 8)
+    BtnCorner.Parent = BlackScreenBtn
+
+    local isBlackScreenOn = false
+
+    local ShowBlackScreenBtnToggle = Tabs.Settings:AddToggle("ShowBlackScreenBtn", {Title = "Show Black Screen Button", Default = false })
+
+    local function toggleBlackScreen(state)
+        if isBlackScreenOn == state then return end 
+        isBlackScreenOn = state
+        BlackFrame.Visible = state
+        
+        if state then
+            BlackScreenBtn.Visible = true 
+            BlackScreenBtn.Text = "Black Screen: ON"
+            BlackScreenBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+            if setfpscap then setfpscap(15) end
+        else
+            if Options.ShowBlackScreenBtn then
+                BlackScreenBtn.Visible = Options.ShowBlackScreenBtn.Value
+            end
+            BlackScreenBtn.Text = "Black Screen: OFF"
+            BlackScreenBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            if setfpscap then setfpscap(60) end
+        end
+        
+        pcall(function()
+            if makefolder and not isfolder("JirametHubConfig") then makefolder("JirametHubConfig") end
+            if writefile then writefile("JirametHubConfig/BS_State.txt", tostring(state)) end
+        end)
+    end
+    
+    SetBlackScreenState = toggleBlackScreen
+
+    BlackScreenBtn.MouseButton1Click:Connect(function()
+        toggleBlackScreen(not isBlackScreenOn)
+    end)
+
+    ShowBlackScreenBtnToggle:OnChanged(function()
+        if not isBlackScreenOn then
+            BlackScreenBtn.Visible = Options.ShowBlackScreenBtn.Value
+        end
+        if not Options.ShowBlackScreenBtn.Value and isBlackScreenOn then
+            toggleBlackScreen(false)
+        end
+    end)
+
+    local AutoSaveToggle = Tabs.Settings:AddToggle("AutoSaveToggle", {Title = "Enable Auto Save (Every 2s)", Default = true })
+    
+    updateSavedState = function()
+        for k, option in pairs(Options) do
+            if type(option.Value) == "table" then
+                lastSavedState[k] = {}
+                for item, val in pairs(option.Value) do
+                    lastSavedState[k][item] = val
+                end
+            else
+                lastSavedState[k] = option.Value
+            end
+        end
+    end
+
+    local function hasConfigChanged()
+        for k, option in pairs(Options) do
+            if type(option.Value) == "table" then
+                local oldTable = lastSavedState[k] or {}
+                for item, val in pairs(option.Value) do
+                    if oldTable[item] ~= val then return true end
+                end
+                for item, val in pairs(oldTable) do
+                    if option.Value[item] ~= val then return true end
+                end
+            else
+                if lastSavedState[k] ~= option.Value then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            if not isConfigLoaded then continue end 
+            
+            if Options.AutoSaveToggle and Options.AutoSaveToggle.Value then
+                if hasConfigChanged() then 
+                    SaveManager:Save("AutoSaveConfig")
+                    updateSavedState() 
+                    Fluent:Notify({ Title = "Auto Save Successful", Content = "Settings saved automatically.", Duration = 1.5 })
+                end
+            end
+        end
+    end)
+end
+
+-- [[ Interface Manager Settings ]] --
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("JirametHubConfig")
+SaveManager:SetFolder("JirametHubConfig/game-config")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(2) 
+
+-- [[ Custom Image Toggle Button ]] --
+local ScreenGui = Instance.new("ScreenGui")
+local ImageButton = Instance.new("ImageButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "JirametHubToggle"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ImageButton.Parent = ScreenGui
+ImageButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+ImageButton.BackgroundTransparency = 0.5
+ImageButton.BorderSizePixel = 0
+ImageButton.Position = UDim2.new(0.12, 0, 0.15, 0)
+ImageButton.Size = UDim2.new(0, 50, 0, 50)
+ImageButton.Image = "rbxassetid://130057809585356"
+ImageButton.Draggable = true 
+
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = ImageButton
+
+ImageButton.MouseButton1Click:Connect(function()
+    Window:Minimize()
+end)
+
+Fluent:Notify({ Title = "Jiramet Hub Loaded", Content = "Version 1.1.0 is active.", Duration = 5 })
+
+-- [[ ระบบ Remove Workspace สำหรับแก้บั๊ก (Badge แจ้งเตือน 5 วินาที) ]] --
+local waitForBadge = true
+local clearConfig = false
+local CoreGui = game:GetService("CoreGui")
+
+local ResetGui = Instance.new("ScreenGui")
+ResetGui.Name = "ResetConfigBadge"
+ResetGui.Parent = CoreGui
+ResetGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local Frame = Instance.new("Frame")
+Frame.Parent = ResetGui
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.Position = UDim2.new(0.5, -150, 0, 20) 
+Frame.Size = UDim2.new(0, 300, 0, 100)
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 8)
+Corner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Parent = Frame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 10)
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Fix Bug: Remove Workspace (รีเซ็ตค่า) ?"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+
+local TimerLabel = Instance.new("TextLabel")
+TimerLabel.Parent = Frame
+TimerLabel.BackgroundTransparency = 1
+TimerLabel.Position = UDim2.new(0, 0, 0, 35)
+TimerLabel.Size = UDim2.new(1, 0, 0, 15)
+TimerLabel.Font = Enum.Font.Gotham
+TimerLabel.Text = "(หายไปใน 5 วินาที)"
+TimerLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TimerLabel.TextSize = 12
+
+local YesBtn = Instance.new("TextButton")
+YesBtn.Parent = Frame
+YesBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
+YesBtn.Position = UDim2.new(0, 30, 0, 60)
+YesBtn.Size = UDim2.new(0, 100, 0, 30)
+YesBtn.Font = Enum.Font.GothamBold
+YesBtn.Text = "Yes (รีเซ็ต)"
+YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+YesBtn.TextSize = 14
+Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
+
+local NoBtn = Instance.new("TextButton")
+NoBtn.Parent = Frame
+NoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+NoBtn.Position = UDim2.new(0, 170, 0, 60)
+NoBtn.Size = UDim2.new(0, 100, 0, 30)
+NoBtn.Font = Enum.Font.GothamBold
+NoBtn.Text = "No (ข้าม)"
+NoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoBtn.TextSize = 14
+Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
+
+YesBtn.MouseButton1Click:Connect(function()
+    clearConfig = true
+    waitForBadge = false
+end)
+
+NoBtn.MouseButton1Click:Connect(function()
+    waitForBadge = false
+end)
+
+local timeLeft = 5
+task.spawn(function()
+    while timeLeft > 0 and waitForBadge do
+        TimerLabel.Text = "(หายไปใน " .. timeLeft .. " วินาที)"
+        task.wait(1)
+        timeLeft = timeLeft - 1
+    end
+    waitForBadge = false
+end)
+
+repeat task.wait(0.1) until not waitForBadge
+pcall(function() ResetGui:Destroy() end)
+
+if clearConfig then
+    pcall(function()
+        if isfolder("JirametHubConfig") then
+            delfolder("JirametHubConfig")
+        end
+        makefolder("JirametHubConfig")
+        makefolder("JirametHubConfig/game-config")
+        makefolder("JirametHubConfig/game-config/settings")
+    end)
+    Fluent:Notify({ Title = "Workspace Cleared", Content = "ลบไฟล์ตั้งค่าเก่าเพื่อแก้บั๊กเรียบร้อยแล้ว", Duration = 3 })
+end
+
+local loadSuccess = pcall(function() SaveManager:Load("AutoSaveConfig") end)
+if not loadSuccess then SaveManager:LoadAutoloadConfig() end
+if updateSavedState then updateSavedState() end
+isConfigLoaded = true 
+
+-- [[ โหลดสถานะ Black Screen ที่ซ่อนไว้ ]] --
+local function loadHiddenBSState()
+    local state = false
+    pcall(function()
+        if isfile and isfile("JirametHubConfig/BS_State.txt") and readfile then
+            state = readfile("JirametHubConfig/BS_State.txt") == "true"
+        end
+    end)
+    return state
+end
+
+task.spawn(function()
+    task.wait(1) 
+    if loadHiddenBSState() and SetBlackScreenState then
+        SetBlackScreenState(true)
+    end
+end)
+
+-- [[ โหลดสถานะ Party ที่ซ่อนไว้เพื่อกู้คืนอัตโนมัติ ]] --
+task.spawn(function()
+    task.wait(2)
+    pcall(function()
+        if isfile and isfile("JirametHubConfig/Party_State.json") and readfile then
+            local state = HttpService:JSONDecode(readfile("JirametHubConfig/Party_State.json"))
+            if state and state.Token and state.Token ~= "" then
+                local data = ReadFirebase("Parties/" .. state.Token)
+                if data then
+                    CurrentToken = state.Token
+                    IsHost = state.IsHost
+                    PartyData = data
+                    
+                    if not IsHost then
+                        local membersList = {}
+                        if type(data.Members) == "table" then
+                            for _, v in pairs(data.Members) do
+                                table.insert(membersList, v)
+                            end
+                        end
+                        
+                        local found = false
+                        for _, v in pairs(membersList) do
+                            if v == player.Name then found = true end
+                        end
+                        if not found then
+                            table.insert(membersList, player.Name)
+                            data.Members = membersList
+                            WriteFirebase("Parties/" .. CurrentToken, data)
+                        end
+                    else
+                        data.JobId = game.JobId
+                        data.PlaceId = game.PlaceId
+                        data.IsInLobby = isInLobby()
+                        WriteFirebase("Parties/" .. CurrentToken, data)
+                    end
+                    
+                    Fluent:Notify({ Title = "Party Restored", Content = "กู้คืนปาร์ตี้เดิมอัตโนมัติสำเร็จ!", Duration = 3 })
+                end
+            end
+        end
+    end)
+    -- ปลดล็อกให้ระบบ Auto Join ทำงานได้ หลังจากโหลดเซฟเสร็จ
+    IsPartyLoaded = true 
+end)
+
+task.spawn(function()
+    task.wait(1.5)
+    if Options.AutoCloseUI and Options.AutoCloseUI.Value then
+        Window:Minimize()
+    end
+end)
