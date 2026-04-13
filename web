@@ -1,10 +1,11 @@
--- [[ REWARDS WEBHOOK SYSTEM (Based on Game Dump) ]] --
+-- [[ REWARDS WEBHOOK SYSTEM (Custom Embed & Test Button) ]] --
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
 -- ==========================================
--- ใส่ลิงก์ Webhook ของคุณตรงนี้! (ไม่ต้องไปวางในเกมแล้ว)
+-- ใส่ลิงก์ Webhook ของคุณตรงนี้!
 -- ==========================================
 local DefaultWebhook = "https://discord.com/api/webhooks/1401441126547980348/R7mqECjgDet4OuCVD3XjGLtkFEUiw04uQ1YCRhSrrstqvz2Waw6BR2YYrnDMMMDUnxq1"
 
@@ -21,8 +22,8 @@ MainFrame.Name = "Main"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -150, 0.4, -90)
-MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -150, 0.4, -110)
+MainFrame.Size = UDim2.new(0, 300, 0, 220) -- ขยายความสูงเพื่อใส่ปุ่ม Test
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -43,20 +44,33 @@ Title.TextSize = 16
 local WebhookInput = Instance.new("TextBox")
 WebhookInput.Parent = MainFrame
 WebhookInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-WebhookInput.Position = UDim2.new(0.1, 0, 0.35, 0)
+WebhookInput.Position = UDim2.new(0.1, 0, 0.25, 0)
 WebhookInput.Size = UDim2.new(0.8, 0, 0, 35)
 WebhookInput.Font = Enum.Font.Gotham
 WebhookInput.PlaceholderText = "Paste Discord Webhook URL"
-WebhookInput.Text = DefaultWebhook -- ดึงลิงก์จากด้านบนมาใส่ให้อัตโนมัติ
+WebhookInput.Text = DefaultWebhook
 WebhookInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-WebhookInput.TextSize = 10 -- ปรับขนาดตัวอักษรให้เล็กลงเพื่อให้เห็นลิงก์ชัดขึ้น
+WebhookInput.TextSize = 10
 WebhookInput.ClearTextOnFocus = false
 Instance.new("UICorner", WebhookInput).CornerRadius = UDim.new(0, 6)
 
+-- ปุ่ม Test Webhook
+local TestBtn = Instance.new("TextButton")
+TestBtn.Parent = MainFrame
+TestBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+TestBtn.Position = UDim2.new(0.1, 0, 0.48, 0)
+TestBtn.Size = UDim2.new(0.8, 0, 0, 35)
+TestBtn.Font = Enum.Font.GothamBold
+TestBtn.Text = "Test Webhook"
+TestBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TestBtn.TextSize = 14
+Instance.new("UICorner", TestBtn).CornerRadius = UDim.new(0, 6)
+
+-- ปุ่มเปิด/ปิดระบบ
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Parent = MainFrame
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.65, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.72, 0)
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.Text = "Status: OFF"
@@ -94,26 +108,113 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- ฟังก์ชันส่ง Webhook
-local function SendRewardsToDiscord(modeStr, chapterStr, dropsText)
+-- ฟังก์ชันใส่คอมม่าให้ตัวเลข
+local function FormatNumber(n)
+    if not n then return "0" end
+    return tostring(math.floor(n)):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
+end
+
+-- ==========================================
+-- ระบบ Test Webhook
+-- ==========================================
+TestBtn.MouseButton1Click:Connect(function()
     local url = WebhookInput.Text
     if url == "" or not url:find("discord") then return end
 
     local requestFunc = http_request or request or HttpPost or syn.request
     if not requestFunc then return end
 
+    -- โครงสร้าง Embed จำลองเพื่อใช้สำหรับทดสอบ (ตรงตามที่คุณออกแบบเป๊ะๆ และตั้งเวลาปัจจุบัน)
+    local testData = {
+        ["embeds"] = {
+            {
+                ["footer"] = {
+                    ["text"] = "Jiramet Hub (TH)",
+                    ["icon_url"] = "https://img1.pic.in.th/images/1000091508.md.png"
+                },
+                ["image"] = {
+                    ["url"] = ""
+                },
+                ["thumbnail"] = {
+                    ["url"] = "https://img1.pic.in.th/images/1000091498.th.jpg"
+                },
+                ["author"] = {
+                    ["name"] = "[🐰EVENT] Re:Rangers X",
+                    ["url"] = "https://www.roblox.com/share?code=3f029d7d2a92274e969aae43736011e9&type=ExperienceDetails&stamp=1776061797166",
+                    ["icon_url"] = "https://img1.pic.in.th/images/1000091498.md.jpg"
+                },
+                ["fields"] = {
+                    {
+                        ["name"] = "Information",
+                        ["value"] = "`⭐` • Username: ||JirametHub||\n`🎊` • Level: 99\n`🌎` • Map: **N/A - WON & DEFEAT**\n`⏳` • TotalTime: **67:67**\n**[ Rewards ]**\n```N/A```",
+                        ["inline"] = true
+                    }
+                },
+                ["timestamp"] = DateTime.now():ToIsoDate() -- อัปเดตเป็นเวลาปัจจุบันแบบ Real-time
+            }
+        },
+        ["components"] = {}
+    }
+
+    pcall(function()
+        requestFunc({
+            Url = url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(testData)
+        })
+    end)
+end)
+
+-- ==========================================
+-- ฟังก์ชันจัดรูปแบบและส่ง Webhook (ของจริงตอนจบด่าน)
+-- ==========================================
+local function SendRewardsToDiscord(mapName, gameStatus, totalTime, playerLevel, dropsText)
+    local url = WebhookInput.Text
+    if url == "" or not url:find("discord") then return end
+
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return end
+
+    local infoContent = string.format(
+        "`⭐` • Username: ||%s||\n`🎊` • Level: %s\n`🌎` • Map: **%s - %s**\n`⏳` • TotalTime: **%s**\n**[ Rewards ]**\n```\n%s```",
+        player.Name,
+        tostring(playerLevel),
+        mapName,
+        gameStatus,
+        totalTime,
+        dropsText
+    )
+
     local data = {
-        ["embeds"] = {{
-            ["title"] = "🏆 Match Finished!",
-            ["color"] = 3447003,
-            ["fields"] = {
-                { ["name"] = "👤 Player", ["value"] = "||" .. player.Name .. "||", ["inline"] = true },
-                { ["name"] = "🌍 Map/Mode", ["value"] = modeStr .. "\n" .. chapterStr, ["inline"] = true },
-                { ["name"] = "🎁 Drops Received", ["value"] = dropsText, ["inline"] = false }
-            },
-            ["footer"] = { ["text"] = "Jiramet Webhook System" },
-            ["timestamp"] = DateTime.now():ToIsoDate()
-        }}
+        ["embeds"] = {
+            {
+                ["footer"] = {
+                    ["text"] = "Jiramet Hub (TH)",
+                    ["icon_url"] = "https://img1.pic.in.th/images/1000091508.md.png"
+                },
+                ["image"] = {
+                    ["url"] = ""
+                },
+                ["thumbnail"] = {
+                    ["url"] = "https://img1.pic.in.th/images/1000091498.th.jpg"
+                },
+                ["author"] = {
+                    ["name"] = "[🐰EVENT] Re:Rangers X",
+                    ["url"] = "https://www.roblox.com/share?code=3f029d7d2a92274e969aae43736011e9&type=ExperienceDetails&stamp=1776061797166",
+                    ["icon_url"] = "https://img1.pic.in.th/images/1000091498.md.jpg"
+                },
+                ["fields"] = {
+                    {
+                        ["name"] = "Information",
+                        ["value"] = infoContent,
+                        ["inline"] = true
+                    }
+                },
+                ["timestamp"] = DateTime.now():ToIsoDate() -- เวลาปัจจุบัน ณ ขณะที่จบเกม
+            }
+        },
+        ["components"] = {}
     }
 
     pcall(function()
@@ -127,54 +228,77 @@ local function SendRewardsToDiscord(modeStr, chapterStr, dropsText)
 end
 
 -- ==========================================
--- 3. ระบบดักจับการจบด่าน (Hooking UI)
+-- 3. ระบบดักจับการจบด่าน (Hooking UI & Inventory)
 -- ==========================================
 task.spawn(function()
-    -- รอให้ RewardsUI เข้ามาใน PlayerGui (เกมจะสร้างไว้ตอนโหลด)
     local playerGui = player:WaitForChild("PlayerGui")
     local rewardsUI = playerGui:WaitForChild("RewardsUI", 99999)
     if not rewardsUI then return end
 
-    -- ดักจับเมื่อ RewardsUI เด้งขึ้นมา (Enabled = true)
     rewardsUI:GetPropertyChangedSignal("Enabled"):Connect(function()
         if systemActive and rewardsUI.Enabled == true then
             
-            -- รอ 2 วินาที ให้ฟังก์ชันในเกมสร้างไอเทมเสร็จก่อน
-            task.wait(2) 
+            task.wait(2) -- รอสคริปต์เกมโหลดของลงหน้าจอให้เสร็จ
             
             pcall(function()
                 local main = rewardsUI:FindFirstChild("Main")
                 if not main then return end
                 
-                -- ดึงข้อมูลโหมดและแชปเตอร์
+                -- ดึงชื่อโหมดและแชปเตอร์มารวมเป็นชื่อ Map
                 local modeText = main.LeftSide.Mode.Text
                 local chapterText = main.LeftSide.Chapter.Text
                 if chapterText == "" or chapterText == "[EMPTY]" then chapterText = "N/A" end
+                local fullMapName = modeText .. " (" .. chapterText .. ")"
 
-                -- ดึงข้อมูลไอเทมจาก ItemsList
+                -- ดึงสถานะด่าน (ตัดเครื่องหมาย ~ ออกแล้วทำให้เป็นตัวพิมพ์ใหญ่)
+                local gameStatusRaw = main.LeftSide:FindFirstChild("GameStatus") and main.LeftSide.GameStatus.Text or "N/A"
+                local gameStatus = gameStatusRaw:gsub("~%s*", ""):upper()
+
+                -- ดึงเวลา
+                local totalTimeRaw = main.LeftSide:FindFirstChild("TotalTime") and main.LeftSide.TotalTime.Text or "00:00:00"
+                local totalTime = totalTimeRaw:gsub("Total Time:%s*", "")
+
+                -- โหลดข้อมูลผู้เล่นผ่าน Module ของเกมเพื่อหาเลเวล
+                local GetDataModule = require(ReplicatedStorage.Shared.GetData)
+                local playerData = GetDataModule.GetData(player)
+                
+                local playerLevel = "N/A"
+                if playerData and playerData:FindFirstChild("Data") and playerData.Data:FindFirstChild("Level") then
+                    playerLevel = playerData.Data.Level.Value
+                end
+
                 local dropListText = ""
                 local itemsList = main.LeftSide.Rewards.ItemsList
                 
                 for _, item in pairs(itemsList:GetChildren()) do
-                    -- กรองเฉพาะเฟรมไอเทม (ไม่ใช่ UIListLayout)
                     if item:IsA("GuiObject") and not item:IsA("UIComponent") then
                         pcall(function()
-                            -- เข้าถึง Text ตามโครงสร้างที่เกม Dump ออกมา
                             local infoFolder = item.Frame.ItemFrame.Info
-                            local itemName = infoFolder.ItemsNames.Text
-                            local amount = infoFolder.DropAmonut.Text 
-                            
-                            dropListText = dropListText .. "📦 **" .. itemName .. "** (" .. amount .. ")\n"
+                            local displayName = infoFolder.ItemsNames.Text
+                            local dropAmount = infoFolder.DropAmonut.Text 
+                            local systemName = item.Name 
+
+                            local totalAmount = 0
+                            if playerData then
+                                if playerData:FindFirstChild("Items") and playerData.Items:FindFirstChild(systemName) then
+                                    totalAmount = playerData.Items[systemName].Amount.Value
+                                elseif playerData:FindFirstChild("Data") and playerData.Data:FindFirstChild(systemName) then
+                                    totalAmount = playerData.Data[systemName].Value
+                                end
+                            end
+
+                            local formattedTotal = FormatNumber(totalAmount)
+                            dropListText = dropListText .. "- " .. displayName .. " (" .. dropAmount .. ") [Total: " .. formattedTotal .. "]\n"
                         end)
                     end
                 end
 
                 if dropListText == "" then
-                    dropListText = "❌ No items dropped."
+                    dropListText = "N/A"
                 end
 
-                -- ส่ง Webhook
-                SendRewardsToDiscord(modeText, chapterText, dropListText)
+                -- สั่งส่ง Webhook แบบของจริง
+                SendRewardsToDiscord(fullMapName, gameStatus, totalTime, playerLevel, dropListText)
             end)
         end
     end)
