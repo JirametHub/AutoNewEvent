@@ -5,7 +5,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 -- [[ ระบบ Discord Webhook ]] --
 task.spawn(function()
     pcall(function()
-        local WebhookURL = "https://discord.com/api/webhooks/1401441126547980348/R7mqECjgDet4OuCVD3XjGLtkFEUiw04uQ1YCRhSrrstqvz2Waw6BR2YYrnDMMMDUnxq1"
+        local WebhookURL = ""
         local player = game:GetService("Players").LocalPlayer
         local HttpService = game:GetService("HttpService")
         local requestFunc = http_request or request or HttpPost or syn.request
