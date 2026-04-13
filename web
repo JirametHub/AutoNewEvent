@@ -1,0 +1,181 @@
+-- [[ REWARDS WEBHOOK SYSTEM (Based on Game Dump) ]] --
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- ==========================================
+-- ใส่ลิงก์ Webhook ของคุณตรงนี้! (ไม่ต้องไปวางในเกมแล้ว)
+-- ==========================================
+local DefaultWebhook = "https://discord.com/api/webhooks/1401441126547980348/R7mqECjgDet4OuCVD3XjGLtkFEUiw04uQ1YCRhSrrstqvz2Waw6BR2YYrnDMMMDUnxq1"
+
+-- ==========================================
+-- 1. สร้าง UI ของระบบ Webhook
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "JirametWebhookUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -150, 0.4, -90)
+MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 10)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Jiramet Webhook Settings"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+
+local WebhookInput = Instance.new("TextBox")
+WebhookInput.Parent = MainFrame
+WebhookInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+WebhookInput.Position = UDim2.new(0.1, 0, 0.35, 0)
+WebhookInput.Size = UDim2.new(0.8, 0, 0, 35)
+WebhookInput.Font = Enum.Font.Gotham
+WebhookInput.PlaceholderText = "Paste Discord Webhook URL"
+WebhookInput.Text = DefaultWebhook -- ดึงลิงก์จากด้านบนมาใส่ให้อัตโนมัติ
+WebhookInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+WebhookInput.TextSize = 10 -- ปรับขนาดตัวอักษรให้เล็กลงเพื่อให้เห็นลิงก์ชัดขึ้น
+WebhookInput.ClearTextOnFocus = false
+Instance.new("UICorner", WebhookInput).CornerRadius = UDim.new(0, 6)
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Parent = MainFrame
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.65, 0)
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "Status: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 15
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = MainFrame
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- ==========================================
+-- 2. ระบบการทำงาน (Logic)
+-- ==========================================
+local systemActive = false
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    systemActive = not systemActive
+    if systemActive then
+        ToggleBtn.Text = "Status: ON"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
+    else
+        ToggleBtn.Text = "Status: OFF"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- ฟังก์ชันส่ง Webhook
+local function SendRewardsToDiscord(modeStr, chapterStr, dropsText)
+    local url = WebhookInput.Text
+    if url == "" or not url:find("discord") then return end
+
+    local requestFunc = http_request or request or HttpPost or syn.request
+    if not requestFunc then return end
+
+    local data = {
+        ["embeds"] = {{
+            ["title"] = "🏆 Match Finished!",
+            ["color"] = 3447003,
+            ["fields"] = {
+                { ["name"] = "👤 Player", ["value"] = "||" .. player.Name .. "||", ["inline"] = true },
+                { ["name"] = "🌍 Map/Mode", ["value"] = modeStr .. "\n" .. chapterStr, ["inline"] = true },
+                { ["name"] = "🎁 Drops Received", ["value"] = dropsText, ["inline"] = false }
+            },
+            ["footer"] = { ["text"] = "Jiramet Webhook System" },
+            ["timestamp"] = DateTime.now():ToIsoDate()
+        }}
+    }
+
+    pcall(function()
+        requestFunc({
+            Url = url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+end
+
+-- ==========================================
+-- 3. ระบบดักจับการจบด่าน (Hooking UI)
+-- ==========================================
+task.spawn(function()
+    -- รอให้ RewardsUI เข้ามาใน PlayerGui (เกมจะสร้างไว้ตอนโหลด)
+    local playerGui = player:WaitForChild("PlayerGui")
+    local rewardsUI = playerGui:WaitForChild("RewardsUI", 99999)
+    if not rewardsUI then return end
+
+    -- ดักจับเมื่อ RewardsUI เด้งขึ้นมา (Enabled = true)
+    rewardsUI:GetPropertyChangedSignal("Enabled"):Connect(function()
+        if systemActive and rewardsUI.Enabled == true then
+            
+            -- รอ 2 วินาที ให้ฟังก์ชันในเกมสร้างไอเทมเสร็จก่อน
+            task.wait(2) 
+            
+            pcall(function()
+                local main = rewardsUI:FindFirstChild("Main")
+                if not main then return end
+                
+                -- ดึงข้อมูลโหมดและแชปเตอร์
+                local modeText = main.LeftSide.Mode.Text
+                local chapterText = main.LeftSide.Chapter.Text
+                if chapterText == "" or chapterText == "[EMPTY]" then chapterText = "N/A" end
+
+                -- ดึงข้อมูลไอเทมจาก ItemsList
+                local dropListText = ""
+                local itemsList = main.LeftSide.Rewards.ItemsList
+                
+                for _, item in pairs(itemsList:GetChildren()) do
+                    -- กรองเฉพาะเฟรมไอเทม (ไม่ใช่ UIListLayout)
+                    if item:IsA("GuiObject") and not item:IsA("UIComponent") then
+                        pcall(function()
+                            -- เข้าถึง Text ตามโครงสร้างที่เกม Dump ออกมา
+                            local infoFolder = item.Frame.ItemFrame.Info
+                            local itemName = infoFolder.ItemsNames.Text
+                            local amount = infoFolder.DropAmonut.Text 
+                            
+                            dropListText = dropListText .. "📦 **" .. itemName .. "** (" .. amount .. ")\n"
+                        end)
+                    end
+                end
+
+                if dropListText == "" then
+                    dropListText = "❌ No items dropped."
+                end
+
+                -- ส่ง Webhook
+                SendRewardsToDiscord(modeText, chapterText, dropListText)
+            end)
+        end
+    end)
+end)
